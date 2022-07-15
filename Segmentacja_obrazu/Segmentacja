@@ -1,0 +1,436 @@
+# Skończone
+import cv2
+import matplotlib.pyplot as plt
+from math import inf
+import numpy as np
+from copy import deepcopy
+
+
+class Vertex:
+    def __init__(self, key, colour=None):
+        self.key = key
+        self.colour = colour
+
+    def __hash__(self):
+        return hash(self.key)
+
+    def __eq__(self, other):
+        return self.key == other.key
+
+    def get_colour(self):
+        return self.colour
+
+    def set_colour(self, colour):
+        self.colour = colour
+
+    def __str__(self):
+        return self.key
+
+
+class Edge:
+    def __init__(self, vertex1, vertex2, weight=1):
+        self.vertex1 = vertex1
+        self.vertex2 = vertex2
+        self.colour = weight
+
+    def __str__(self):
+        return f'({self.vertex1.key}->{self.vertex2.key}, {self.colour})'
+
+
+class AdjacencyList:
+    def __init__(self):
+        self.mapa = dict()  # Konwertuje węzeł na jego indeks
+        self.lista = []  # Lista z węzłami
+        self.adjlist = dict()  # Z indeksami do elementów
+        self.edges = []  # Lista z krawędziami
+        self.get_weight = dict()  # Konwertuje indeksy na krawędź
+
+    def insertVertex(self, vertex):
+        if vertex in self.lista:
+            raise Exception('Węzeł już istnieje')
+        self.lista.append(vertex)
+        idx = self.lista.index(vertex)
+        self.mapa[vertex] = idx
+        self.adjlist[idx] = []
+
+    def insertEdge(self, vertex1, vertex2, weight=1):
+        if vertex1 in self.lista and vertex2 in self.lista and vertex1 != vertex2:
+            v1 = self.getVertexIdx(vertex1)
+            v2 = self.getVertexIdx(vertex2)
+            if v1 not in self.adjlist[v2] or v2 not in self.adjlist[v1]:
+                self.adjlist[v1].append(v2)
+                self.adjlist[v1].sort()
+
+                self.adjlist[v2].append(v1)
+                self.adjlist[v2].sort()
+            self.edges.append(Edge(vertex1, vertex2, weight))
+            self.get_weight[(v1, v2)] = weight
+        else:
+            raise Exception('Nie ma takiego wierzchołka')
+
+    def deleteVertex(self, vertex):
+        if vertex in self.lista:
+            v = self.getVertexIdx(vertex)
+            lista = [x for x in self.adjlist[v]]
+
+            for y in lista:
+                self.deleteEdge(vertex, self.getVertex(y))
+
+            self.adjlist.pop(v)
+            self.mapa.pop(vertex)
+            self.lista.remove(vertex)
+
+            for x in self.lista:
+                self.mapa[x] = self.lista.index(x)
+
+            old = self.adjlist.copy()
+            for k, j in old.items():
+                for q in j:
+                    if q > v:
+                        idx = j.index(q)
+                        j[idx] = q - 1
+                if k > v:
+                    self.adjlist[k - 1] = j
+                    self.adjlist.pop(k)
+                else:
+                    self.adjlist[k] = j
+
+        else:
+            raise Exception('Nie ma takiego wierzchołka')
+
+    def deleteEdge(self, vertex1, vertex2):
+        if vertex1 in self.lista and vertex2 in self.lista:
+            v1 = self.getVertexIdx(vertex1)
+            v2 = self.getVertexIdx(vertex2)
+
+            self.adjlist[v1].remove(v2)
+            self.adjlist[v2].remove(v1)
+        else:
+            raise Exception('Nie ma takiego wierzchołka')
+
+    def getVertexIdx(self, vertex):
+        return self.mapa[vertex]
+
+    def getVertex(self, vertex_idx):
+        return self.lista[vertex_idx]
+
+    # Trzeba zmienić neighbours, bo przyjmuje krotkę indeks waga
+    def neighbours(self, vertex_idx):
+        lista = self.adjlist[vertex_idx]
+        newl = []
+        for p in lista:
+            newl.append((p, self.get_weight[(vertex_idx, p)]))
+        return newl
+
+    def size(self):
+        return len(self.list_of_edges())
+
+    def list_of_edges(self):
+        lista = []
+        for k, v in self.adjlist.items():
+            for _ in v:
+                lista.append((self.getVertex(k).key, self.getVertex(i).key))
+        return lista
+
+    def order(self):
+        return len(self.adjlist)
+
+
+def MST(G, newG):
+    length = 0
+    intree = [0] * G.order()
+    distance = [inf] * G.order()
+    parent = [-1] * G.order()
+
+    v = 0
+    distance[v] = 0
+    while intree[v] == 0:
+        intree[v] = 1
+        length += distance[v]
+        for ver in G.neighbours(v):
+            if ver[1] < distance[ver[0]] and intree[ver[0]] == 0:
+                distance[ver[0]] = ver[1]
+                parent.pop(ver[0])
+                parent.insert(ver[0], v)
+
+        minimum = inf
+        for idx in range(len(intree)):
+            if intree[idx] == 0:
+
+                if distance[idx] < minimum:
+                    minimum = distance[idx]
+                    v = idx
+
+        newG.insertEdge(newG.getVertex(parent[v]), newG.getVertex(v), distance[v])
+        newG.insertEdge(newG.getVertex(v), newG.getVertex(parent[v]), distance[v])
+
+    return newG, length
+
+
+def printGraph(g):
+    n = g.order()
+    print("------GRAPH------", n)
+    for i in range(n):
+        v = g.getVertex(i)
+        print(v, end=" -> ")
+        nbrs = g.neighbours(i)
+        for (j, w) in nbrs:
+            print(g.getVertex(j), w, end=";")
+        print()
+    print("-------------------")
+
+
+def DFS(graf, s=0, visited=None):
+    if visited is None:
+        visited = []
+    S = [s]
+    while S:
+        s = S.pop()
+        if s not in visited:
+            visited.append(s)
+            for i in graf.neighbours(s)[::-1]:
+                S.append(i[0])
+    return visited
+
+
+def segmentacja(graf, max_idx, num=0):
+
+    if num == 1 or num == 0:
+        one = DFS(graf, max_idx[0])
+        for i in one:
+            graf.getVertex(i).set_colour(100)
+
+    if num == 2 or num == 0:
+        two = DFS(graf, max_idx[1])
+        for ss in two:
+            graf.getVertex(ss).set_colour(155)
+
+    # Obraz oryginalny
+    plt.imshow(I, 'gray')
+    plt.show()
+
+    IS = np.zeros((YY, XX), dtype='uint8')
+
+    for i in range(XX):
+        for j in range(YY):
+            IS[j][i] = graf.getVertex(YY * j + i).colour
+
+    # Obraz wyjściowy
+    plt.imshow(IS, 'gray', vmin=0, vmax=255)
+    plt.show()
+
+
+if __name__ == '__main__':
+    I = cv2.imread('sample.png', cv2.IMREAD_GRAYSCALE)
+
+    D = AdjacencyList()
+
+    XX, YY = I.shape
+
+    for i in range(XX):
+        for j in range(YY):
+            D.insertVertex(Vertex(YY * j + i, I[i][j]))
+
+    cop = deepcopy(D)
+
+    for i in range(XX):
+        for j in range(YY):
+            # w rogach
+            if j == 0 and i == 0:
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i + 1), np.abs(I[j][i] - I[j][i + 1]))
+                D.insertEdge(D.getVertex(YY * j + i + 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i + 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i), np.abs(I[j][i] - I[j + 1][i]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j + 1][i]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i + 1),
+                             np.abs(I[j][i] - I[j + 1][i + 1]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i + 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j + 1][i + 1]))
+
+            elif j == YY - 1 and i == 0:
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i + 1), np.abs(I[j][i] - I[j][i + 1]))
+                D.insertEdge(D.getVertex(YY * j + i + 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i + 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i), np.abs(I[j][i] - I[j - 1][i]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j - 1][i]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i + 1),
+                             np.abs(I[j][i] - I[j - 1][i + 1]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i + 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j - 1][i + 1]))
+
+            elif j == 0 and i == XX - 1:
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i - 1), np.abs(I[j][i] - I[j][i - 1]))
+                D.insertEdge(D.getVertex(YY * j + i - 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i - 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i), np.abs(I[j][i] - I[j + 1][i]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j + 1][i]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i - 1),
+                             np.abs(I[j][i] - I[j + 1][i - 1]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i - 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j + 1][i - 1]))
+
+            elif j == YY - 1 and i == XX - 1:
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i - 1), np.abs(I[j][i] - I[j][i - 1]))
+                D.insertEdge(D.getVertex(YY * j + i - 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i - 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i), np.abs(I[j][i] - I[j - 1][i]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j - 1][i]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i - 1),
+                             np.abs(I[j][i] - I[j - 1][i - 1]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i - 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j - 1][i - 1]))
+
+            # brzegi
+            elif j == 0:
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i - 1), np.abs(I[j][i] - I[j][i - 1]))
+                D.insertEdge(D.getVertex(YY * j + i - 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i - 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i), np.abs(I[j][i] - I[j + 1][i]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j + 1][i]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i + 1), np.abs(I[j][i] - I[j][i + 1]))
+                D.insertEdge(D.getVertex(YY * j + i + 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i + 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i + 1),
+                             np.abs(I[j][i] - I[j + 1][i + 1]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i + 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j + 1][i + 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i - 1),
+                             np.abs(I[j][i] - I[j + 1][i - 1]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i - 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j + 1][i - 1]))
+
+            elif j == YY - 1:
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i - 1), np.abs(I[j][i] - I[j][i - 1]))
+                D.insertEdge(D.getVertex(YY * j + i - 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i - 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i), np.abs(I[j][i] - I[j - 1][i]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j - 1][i]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i + 1), np.abs(I[j][i] - I[j][i + 1]))
+                D.insertEdge(D.getVertex(YY * j + i + 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i + 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i + 1),
+                             np.abs(I[j][i] - I[j - 1][i + 1]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i + 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j - 1][i + 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i - 1),
+                             np.abs(I[j][i] - I[j - 1][i - 1]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i - 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j - 1][i - 1]))
+
+            elif i == 0:
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i + 1), np.abs(I[j][i] - I[j][i + 1]))
+                D.insertEdge(D.getVertex(YY * j + i + 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i + 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i), np.abs(I[j][i] - I[j - 1][i]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j - 1][i]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i + 1),
+                             np.abs(I[j][i] - I[j + 1][i + 1]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i + 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j + 1][i + 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i + 1),
+                             np.abs(I[j][i] - I[j - 1][i + 1]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i + 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j - 1][i + 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i),
+                             np.abs(I[j][i] - I[j + 1][i]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j + 1][i]))
+
+            elif i == XX - 1:
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i - 1), np.abs(I[j][i] - I[j][i - 1]))
+                D.insertEdge(D.getVertex(YY * j + i - 1), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j][i - 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i), np.abs(I[j][i] - I[j - 1][i]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i), D.getVertex(YY * j + i), np.abs(I[j][i] - I[j - 1][i]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i),
+                             np.abs(I[j][i] - I[j + 1][i]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j + 1][i]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i - 1),
+                             np.abs(I[j][i] - I[j - 1][i - 1]))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i - 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j - 1][i - 1]))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i - 1),
+                             np.abs(I[j][i] - I[j + 1][i - 1]))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i - 1), D.getVertex(YY * j + i),
+                             np.abs(I[j][i] - I[j + 1][i - 1]))
+
+            # W środku
+            else:
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i - 1),
+                             np.abs(int(I[j][i]) - int(I[j][i - 1])))
+                D.insertEdge(D.getVertex(YY * j + i - 1), D.getVertex(YY * j + i),
+                             np.abs(int(I[j][i]) - int(I[j][i - 1])))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * j + i + 1),
+                             np.abs(int(I[j][i]) - int(I[j][i + 1])))
+                D.insertEdge(D.getVertex(YY * j + i + 1), D.getVertex(YY * j + i),
+                             np.abs(int(I[j][i]) - int(I[j][i + 1])))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i),
+                             np.abs(int(I[j][i]) - int(I[j + 1][i])))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i), D.getVertex(YY * j + i),
+                             np.abs((I[j][i]) - int(I[j + 1][i])))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i),
+                             np.abs(int(I[j][i]) - int(I[j - 1][i])))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i), D.getVertex(YY * j + i),
+                             np.abs(int(I[j][i]) - int(I[j - 1][i])))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i - 1),
+                             np.abs(int(I[j][i]) - int(I[j - 1][i - 1])))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i - 1), D.getVertex(YY * j + i),
+                             np.abs(int(I[j][i]) - int(I[j - 1][i - 1])))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j - 1) + i + 1),
+                             np.abs(int(I[j][i]) - int(I[j - 1][i + 1])))
+                D.insertEdge(D.getVertex(YY * (j - 1) + i + 1), D.getVertex(YY * j + i),
+                             np.abs(int(I[j][i]) - int(I[j - 1][i + 1])))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i + 1),
+                             np.abs(int(I[j][i]) - int(I[j + 1][i + 1])))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i + 1), D.getVertex(YY * j + i),
+                             np.abs(int(I[j][i]) - int(I[j + 1][i + 1])))
+
+                D.insertEdge(D.getVertex(YY * j + i), D.getVertex(YY * (j + 1) + i - 1),
+                             np.abs(int(I[j][i]) - int(I[j + 1][i - 1])))
+                D.insertEdge(D.getVertex(YY * (j + 1) + i - 1), D.getVertex(YY * j + i),
+                             np.abs(int(I[j][i]) - int(I[j + 1][i - 1])))
+
+    new, le = MST(D, cop)
+    max_idx = None
+    maxi = 0
+
+    for k, v in new.adjlist.items():
+        for vi in v:
+            if new.get_weight[(k, vi)] > maxi:
+                maxi = new.get_weight[(k, vi)]
+                max_idx = (k, vi)
+
+    new.deleteEdge(new.getVertex(max_idx[0]), new.getVertex(max_idx[1]))
+
+    new1 = deepcopy(new)
+    new2 = deepcopy(new)
+    
+    # Dla obu
+    segmentacja(new, max_idx, 0)
+    
+    # Dla jednego drzewa
+    segmentacja(new1, max_idx, 1)
+    
+    # Dla drugiego drzewa
+    segmentacja(new2, max_idx, 2)
